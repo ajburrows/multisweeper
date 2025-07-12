@@ -396,14 +396,17 @@ export default function Index() {
               data={grid}
               keyExtractor={(_, rowIdx) => rowIdx.toString()}
               renderItem={({ item: rowArr, index: rowIdx }) => (
-                <View style={styles.row}>
-                  {rowArr.map((cell, colIdx) => {
+                <FlatList
+                  data={rowArr}
+                  keyExtractor={(_, colIdx) => colIdx.toString()}
+                  horizontal
+                  renderItem={({ item: cell, index: colIdx }) => {
                     let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
                     if (cell.revealed) cellStyle.push(styles.revealedCell);
                     if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
+
                     return (
                       <Cell
-                        key={colIdx}
                         cell={cell}
                         onPress={() => handleCellPress(rowIdx, colIdx)}
                         onLongPress={() => handleCellLongPress(rowIdx, colIdx)}
@@ -413,11 +416,22 @@ export default function Index() {
                         colIdx={colIdx}
                       />
                     );
+                  }}
+                  scrollEnabled={false}
+                  contentContainerStyle={styles.row}
+                  getItemLayout={(_, index) => ({
+                    length: CELL_SIZE + CELL_MARGIN,
+                    offset: (CELL_SIZE + CELL_MARGIN) * index,
+                    index,
                   })}
-                </View>
+                />
               )}
               extraData={grid}
-              getItemLayout={(_, index) => ({ length: CELL_SIZE + CELL_MARGIN, offset: (CELL_SIZE + CELL_MARGIN) * index, index })}
+              getItemLayout={(_, index) => ({
+                length: CELL_SIZE + CELL_MARGIN,
+                offset: (CELL_SIZE + CELL_MARGIN) * index,
+                index,
+              })}
               showsVerticalScrollIndicator={false}
               bounces={false}
             />
