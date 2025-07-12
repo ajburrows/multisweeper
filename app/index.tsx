@@ -375,6 +375,8 @@ export default function Index() {
     setTimerActive(false);
   };
 
+  const flatGrid = React.useMemo(() => grid.flat(), [grid]);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider>
@@ -399,60 +401,52 @@ export default function Index() {
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.grid, animatedGridStyle]}>
             <FlatList
+              key={`grid-${cols}`}
+              data={flatGrid}
+              keyExtractor={(_, index) => index.toString()}
+              numColumns={cols}
               scrollEnabled={false}
-              data={grid}
-              keyExtractor={(_, rowIdx) => rowIdx.toString()}
-              renderItem={({ item: rowArr, index: rowIdx }) => (
-                <FlatList
-                  scrollEnabled={false}
-                  data={rowArr}
-                  keyExtractor={(_, colIdx) => colIdx.toString()}
-                  horizontal
-                  renderItem={({ item: cell, index: colIdx }) => {
-                    let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
-                    if (cell.revealed) cellStyle.push(styles.revealedCell);
-                    if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
-                    return (
-                      <Cell
-                        cell={cell}
-                        onPress={() => {
-                          const cell = grid[rowIdx][colIdx];
-                          if (cell.revealed && cell.adjacentMines > 0) {
-                            handleCellPress(rowIdx, colIdx); // always allow chording on revealed numbers
-                          } else if (flagMode) {
-                            handleCellLongPress(rowIdx, colIdx); // tap to flag
-                          } else {
-                            handleCellPress(rowIdx, colIdx); // tap to reveal
-                          }
-                        }}
-                        onLongPress={() =>
-                          flagMode
-                            ? handleCellPress(rowIdx, colIdx)     // hold to reveal
-                            : handleCellLongPress(rowIdx, colIdx) // hold to flag
-                        }
-                        delayLongPress={250}
-                        cellStyle={cellStyle}
-                        rowIdx={rowIdx}
-                        colIdx={colIdx}
-                      />
-                    );
-                  }}
-                  contentContainerStyle={styles.row}
-                  getItemLayout={(_, index) => ({
-                    length: CELL_SIZE + CELL_MARGIN,
-                    offset: (CELL_SIZE + CELL_MARGIN) * index,
-                    index,
-                  })}
-                />
-              )}
-              extraData={grid}
+              renderItem={({ item: cell, index }) => {
+                const rowIdx = Math.floor(index / cols);
+                const colIdx = index % cols;
+                let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
+                if (cell.revealed) cellStyle.push(styles.revealedCell);
+                if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
+
+                return (
+                  <Cell
+                    cell={cell}
+                    onPress={() => {
+                      const cell = grid[rowIdx][colIdx];
+                      if (cell.revealed && cell.adjacentMines > 0) {
+                        handleCellPress(rowIdx, colIdx);
+                      } else if (flagMode) {
+                        handleCellLongPress(rowIdx, colIdx);
+                      } else {
+                        handleCellPress(rowIdx, colIdx);
+                      }
+                    }}
+                    onLongPress={() =>
+                      flagMode
+                        ? handleCellPress(rowIdx, colIdx)
+                        : handleCellLongPress(rowIdx, colIdx)
+                    }
+                    delayLongPress={250}
+                    cellStyle={cellStyle}
+                    rowIdx={rowIdx}
+                    colIdx={colIdx}
+                  />
+                );
+              }}
+              contentContainerStyle={{
+                flexDirection: "column",
+                alignItems: "center",
+              }}
               getItemLayout={(_, index) => ({
                 length: CELL_SIZE + CELL_MARGIN,
                 offset: (CELL_SIZE + CELL_MARGIN) * index,
                 index,
               })}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
             />
           </Animated.View>
         </GestureDetector>
