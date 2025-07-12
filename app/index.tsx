@@ -6,12 +6,12 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { Provider as PaperProvider } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import {
-  countAdjacentMines,
   createEmptyGrid,
   Grid,
-  placeMines,
-  revealCellsDFS,
+  revealCellsDFS
 } from "./multisweeper";
+const API_BASE_URL = "https://multisweeper-dpeu.onrender.com";
+
 
 const DIFFICULTIES = [
   { label: "Easy (10x8, 10 mines)", value: "easy", rows: 10, cols: 8, mines: 10 },
@@ -212,7 +212,7 @@ export default function Index() {
     setVictoryVisible(false);
   };
 
-  const handleCellPress = (row: number, col: number) => {
+  const handleCellPress = async (row: number, col: number) => {
     let newGrid: Grid = grid;
     const cell = newGrid[row][col];
     if (cell.revealed && cell.adjacentMines > 0) {
@@ -277,12 +277,27 @@ export default function Index() {
       newGrid = grid.map((rowArr, r) =>
         rowArr.map((cell, c) => ({ ...cell }))
       );
-      placeMines(newGrid, mines, row, col);
-      countAdjacentMines(newGrid);
-      newGrid = revealCellsDFS(newGrid, row, col);
-      setMinesPlaced(true);
-      setTimerActive(true); // Start timer on first click
-      setGrid(newGrid);
+//
+    const response = await fetch(`${API_BASE_URL}/start-game`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rows,
+        cols,
+        mines,
+        firstClickRow: row,
+        firstClickCol: col,
+      }),
+    });
+
+    const result = await response.json();
+    setGrid(result.grid);
+    setMinesPlaced(true);
+    setTimerActive(true);
+
+
+//
+
     } else {
       if (!cell.revealed) {
         // Only copy the row and cell that change
@@ -301,8 +316,28 @@ export default function Index() {
           newGrid = grid.map((rowArr, r) =>
             rowArr.map((cell, c) => ({ ...cell }))
           );
-          newGrid = revealCellsDFS(newGrid, row, col);
-          setGrid(newGrid);
+//
+        try {
+          const response = await fetch(`${API_BASE_URL}/reveal`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              grid,
+              row,
+              col,
+            }),
+          });
+
+          const result = await response.json();
+          setGrid(result.grid);
+        } catch (err) {
+          console.error("Reveal error:", err);
+        }
+
+
+//
+
+
         } else {
           newRow[col] = { ...cell, revealed: true };
           newGrid = [...newGrid];

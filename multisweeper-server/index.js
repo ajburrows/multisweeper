@@ -10,6 +10,14 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const SECRET = process.env.JWT_SECRET || "dev_secret_key";
 
+const {
+  createEmptyGrid,
+  placeMines,
+  countAdjacentMines,
+  revealCellsDFS
+} = require("./gameLogic");
+
+
 app.use(cors());
 app.use(express.json());
 
@@ -79,6 +87,39 @@ app.get("/profile", (req, res) => {
     res.status(401).json({ error: "Invalid token" });
   }
 });
+
+
+app.post("/start-game", (req, res) => {
+  const { rows, cols, mines, firstClickRow, firstClickCol } = req.body;
+
+  let grid = createEmptyGrid(rows, cols);
+  placeMines(grid, mines, firstClickRow, firstClickCol);
+  countAdjacentMines(grid);
+  grid = revealCellsDFS(grid, firstClickRow, firstClickCol); // reveal area from first click
+
+  res.json({ grid });
+});
+
+app.post("/reveal", (req, res) => {
+  const { grid, row, col } = req.body;
+
+  if (!grid || grid.length === 0) {
+    return res.status(400).json({ error: "Invalid grid data" });
+  }
+
+  const cell = grid[row][col];
+  if (cell.revealed || cell.flagged) {
+    return res.json({ grid }); // nothing to update
+  }
+
+  // Deep copy to avoid mutating client state (optional but safer)
+  const copiedGrid = grid.map(row => row.map(cell => ({ ...cell })));
+
+  const updatedGrid = revealCellsDFS(copiedGrid, row, col);
+  res.json({ grid: updatedGrid });
+});
+
+
 
 app.get("/", (req, res) => {
     res.send("✅ Multisweeper backend is running!");
