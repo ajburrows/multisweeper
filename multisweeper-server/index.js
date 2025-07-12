@@ -90,12 +90,17 @@ app.get("/profile", (req, res) => {
 
 
 app.post("/start-game", (req, res) => {
+  const start = Date.now();
+
   const { rows, cols, mines, firstClickRow, firstClickCol } = req.body;
 
   let grid = createEmptyGrid(rows, cols);
   placeMines(grid, mines, firstClickRow, firstClickCol);
   countAdjacentMines(grid);
-  grid = revealCellsDFS(grid, firstClickRow, firstClickCol); // reveal area from first click
+  grid = revealCellsDFS(grid, firstClickRow, firstClickCol);
+
+  const end = Date.now();
+  console.log(`⏱️ Grid generation took ${end - start}ms`);
 
   res.json({ grid });
 });
