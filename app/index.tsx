@@ -110,6 +110,7 @@ export default function Index() {
   const [timerActive, setTimerActive] = useState(false);
   const [difficulty, setDifficulty] = useState("easy");
   const [flagCount, setFlagCount] = useState(0);
+  const [flagMode, setFlagMode] = useState(false);
   const difficultyObj = DIFFICULTIES.find(d => d.value === difficulty) || DIFFICULTIES[0];
   const { rows, cols, mines } = difficultyObj;
   const gridWidth = (cols) * (CELL_SIZE + CELL_MARGIN);
@@ -384,9 +385,15 @@ export default function Index() {
           <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
       </View>
-      <View style={styles.infoBar}>
-        <Text style={styles.timerText}>⏱️ {formatTime(gameTime)}</Text>
-        <Text style={styles.flagCounter}>🚩 {flagCount}</Text>
+      <View style={[styles.infoBar, { maxWidth: containerSize.width }]}>
+        <Text style={styles.timerText} numberOfLines={1} adjustsFontSizeToFit>⏱️ {formatTime(gameTime)}</Text>
+        <Text style={styles.flagCounter} numberOfLines={1} adjustsFontSizeToFit>🚩 {flagCount}</Text>
+        <TouchableOpacity
+          style={[styles.timerText, { marginLeft: 12, backgroundColor: flagMode ? "#ffb300" : "#1976d2" }]}
+          onPress={() => setFlagMode(!flagMode)}
+        >
+          <Text style={styles.resetText} numberOfLines={1} adjustsFontSizeToFit>{flagMode ? "🚩 Mode" : "👆 Mode"}</Text>
+        </TouchableOpacity>
       </View>
       <View style={[styles.gridPanContainer, { width: containerSize.width, height: containerSize.height }]}>
         <GestureDetector gesture={panGesture}>
@@ -397,6 +404,7 @@ export default function Index() {
               keyExtractor={(_, rowIdx) => rowIdx.toString()}
               renderItem={({ item: rowArr, index: rowIdx }) => (
                 <FlatList
+                  scrollEnabled={false}
                   data={rowArr}
                   keyExtractor={(_, colIdx) => colIdx.toString()}
                   horizontal
@@ -404,12 +412,24 @@ export default function Index() {
                     let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
                     if (cell.revealed) cellStyle.push(styles.revealedCell);
                     if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
-
                     return (
                       <Cell
                         cell={cell}
-                        onPress={() => handleCellPress(rowIdx, colIdx)}
-                        onLongPress={() => handleCellLongPress(rowIdx, colIdx)}
+                        onPress={() => {
+                          const cell = grid[rowIdx][colIdx];
+                          if (cell.revealed && cell.adjacentMines > 0) {
+                            handleCellPress(rowIdx, colIdx); // always allow chording on revealed numbers
+                          } else if (flagMode) {
+                            handleCellLongPress(rowIdx, colIdx); // tap to flag
+                          } else {
+                            handleCellPress(rowIdx, colIdx); // tap to reveal
+                          }
+                        }}
+                        onLongPress={() =>
+                          flagMode
+                            ? handleCellPress(rowIdx, colIdx)     // hold to reveal
+                            : handleCellLongPress(rowIdx, colIdx) // hold to flag
+                        }
                         delayLongPress={250}
                         cellStyle={cellStyle}
                         rowIdx={rowIdx}
@@ -417,7 +437,6 @@ export default function Index() {
                       />
                     );
                   }}
-                  scrollEnabled={false}
                   contentContainerStyle={styles.row}
                   getItemLayout={(_, index) => ({
                     length: CELL_SIZE + CELL_MARGIN,
@@ -524,7 +543,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   flagCounter: {
-    fontSize: 18,
+    flexShrink: 1,
+    flexGrow: 1,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -735,12 +756,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   timerText: {
+    flexShrink: 1,
+    flexGrow: 1,
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 16,
     textShadowColor: "#0006",
     textShadowOffset: { width: 1, height: 2 },
@@ -749,8 +772,24 @@ const styles = StyleSheet.create({
   infoBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: 24,
     marginBottom: 12,
+    alignSelf: 'center',
+  },
+  activeModeButton: {
+    backgroundColor: "#ffb300",
+  },
+  modeButton: {
+    marginTop: 32,
+    backgroundColor: "#1976d2",
+    paddingHorizontal: 36,
+    paddingVertical: 16,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
 });
