@@ -97,11 +97,7 @@ app.post("/start-game", (req, res) => {
   let grid = createEmptyGrid(rows, cols);
   placeMines(grid, mines, firstClickRow, firstClickCol);
   countAdjacentMines(grid);
-  const revealedCells = revealCellsDFS(grid, firstClickRow, firstClickCol);
-
-  for (const { row, col } of revealedCells) {
-    grid[row][col].revealed = true
-  }
+  grid = revealCellsDFS(grid, firstClickRow, firstClickCol);
 
   const end = Date.now();
   console.log(`⏱️ Grid generation took ${end - start}ms`);
