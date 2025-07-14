@@ -1,10 +1,8 @@
 // If you haven't installed expo-linear-gradient, run: npx expo install expo-linear-gradient
 import { LinearGradient } from 'expo-linear-gradient';
 import { default as React, useCallback, useState } from "react";
-import { FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
 import { Provider as PaperProvider } from 'react-native-paper';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import {
   Cell as CellType,
   createEmptyGrid,
@@ -84,18 +82,6 @@ const Cell = React.memo<CellProps>(({
 });
 
 export default function Index() {
-  // Reanimated pan values
-  const panX = useSharedValue(0);
-  const panY = useSharedValue(0);
-  const prevPanX = useSharedValue(0);
-  const prevPanY = useSharedValue(0);
-  const animatedStyles = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: panX.value },
-      { translateY: panY.value }
-    ]
-  }))
-  // Cell size and margin must match styles.cell
   const CELL_SIZE = 36;
   const CELL_MARGIN = 2;
   const [victoryVisible, setVictoryVisible] = useState(false);
@@ -107,36 +93,6 @@ export default function Index() {
   const gridHeight = (ROWS) * (CELL_SIZE + CELL_MARGIN);
   const containerSize = getContainerSize(gridWidth, gridHeight);
 
-  const animatedGridStyle = useAnimatedStyle(() => ({
-    width: gridWidth + (CELL_SIZE-CELL_MARGIN),
-    height: gridHeight + (CELL_SIZE),
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    transform: [
-      { translateX: panX.value },
-      { translateY: panY.value },
-    ],
-  }));
-
-  const panGesture = Gesture.Pan()
-  .minDistance(0)
-  .onStart(() => {
-    prevPanX.value = panX.value;
-    prevPanY.value = panY.value;
-  })
-  .onUpdate(e => {
-    panX.value = e.translationX + prevPanX.value;
-    panY.value = e.translationY + prevPanY.value;
-  });
-
-  // Center the grid in the container on mount and when grid/container size changes
-  React.useEffect(() => {
-    const offsetX = (containerSize.width - gridWidth) / 2 - CELL_SIZE/2;
-    const offsetY = (containerSize.height - gridHeight) / 2 - CELL_SIZE/2;
-    panX.value = offsetX;
-    panY.value = offsetY;
-  }, [gridWidth, gridHeight, containerSize.width, containerSize.height]);
   const [grid, setGrid] = useState(() => createEmptyGrid(ROWS, COLS));
   const [minesPlaced, setMinesPlaced] = useState(false);
 
@@ -357,10 +313,7 @@ export default function Index() {
     };
   }, [flagMode, handleCellPress, handleCellLongPress]);
 
-  const flatGrid = grid.flat();
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider>
     <LinearGradient colors={["#43cea2", "#185a9d"]} style={styles.container}>
       <View style={styles.header}>
@@ -377,45 +330,25 @@ export default function Index() {
         </TouchableOpacity>
       </View>
       <View style={[styles.gridPanContainer, { width: containerSize.width, height: containerSize.height }]}>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View style={[styles.grid, animatedGridStyle]}>
-            <FlatList
-              key={`grid-${COLS}`}
-              data={flatGrid}
-              keyExtractor={(_, index) => index.toString()}
-              numColumns={COLS}
-              scrollEnabled={false}
-              renderItem={({ item: cell, index }) => {
-                const rowIdx = Math.floor(index / COLS);
-                const colIdx = index % COLS;
-                let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
-                if (cell.revealed) cellStyle.push(styles.revealedCell);
-                if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
-
-                return (
-                  <Cell
-                    cell={cell}
-                    onPress={createCellPressHandler(rowIdx, colIdx)}
-                    onLongPress={createCellLongPressHandler(rowIdx, colIdx)}
-                    delayLongPress={250}
-                    cellStyle={cellStyle}
-                    rowIdx={rowIdx}
-                    colIdx={colIdx}
-                  />
-                );
-              }}
-              contentContainerStyle={{
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-              getItemLayout={(_, index) => ({
-                length: CELL_SIZE + CELL_MARGIN,
-                offset: (CELL_SIZE + CELL_MARGIN) * index,
-                index,
-              })}
-            />
-          </Animated.View>
-        </GestureDetector>
+          {Array(ROWS).fill(0).map((_, r) => (
+            <View key={r} style={styles.row}>
+              {Array(COLS).fill(0).map((_, c) => (
+                <Cell
+                  key={`${r}-${c}`}
+                  cell={grid[r][c]}
+                  onPress={() => handleCellPress(r, c)}
+                  onLongPress={() => handleCellLongPress(r, c)}
+                  delayLongPress={100}
+                  cellStyle={[
+                    styles.cell,
+                    grid[r][c].revealed && styles.revealedCell
+                  ]}
+                  rowIdx={r}
+                  colIdx={c}
+                />
+              ))}
+            </View>
+          ))}
       </View>
       <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
         <Text style={styles.resetText}>Reset</Text>
@@ -438,7 +371,6 @@ export default function Index() {
       </Modal>
     </LinearGradient>
     </PaperProvider>
-    </GestureHandlerRootView>
   );
 }
 
@@ -591,6 +523,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.04)',
     borderRadius: 16,
     marginBottom: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
