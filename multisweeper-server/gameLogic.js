@@ -70,7 +70,9 @@ function revealCellsDFS(grid, row, col) {
   const cols = grid[0].length;
   const stack = [[row, col]];
   const visited = new Set();
+  const revealedCells = new Set();
 
+  // return True if cell is in the grid, unrevealed, and not visited yet
   const isSafe = (r, c) =>
     r >= 0 && r < rows &&
     c >= 0 && c < cols &&
@@ -83,20 +85,22 @@ function revealCellsDFS(grid, row, col) {
     if (!isSafe(r, c)) continue;
 
     grid[r][c].revealed = true;
+    revealedCells.add({ "row": r, "col": c })
+
     visited.add(key);
 
     if (grid[r][c].adjacentMines === 0 && !grid[r][c].hasMine) {
       for (const [dr, dc] of [
         [-1, -1], [-1, 0], [-1, 1],
-        [0, -1],          [0, 1],
-        [1, -1], [1, 0], [1, 1],
+        [0, -1],           [0, 1],
+        [1, -1],  [1, 0],  [1, 1],
       ]) {
         stack.push([r + dr, c + dc]);
       }
     }
   }
 
-  return grid;
+  return revealedCells;
 }
 
 module.exports = {
