@@ -2,9 +2,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { default as React, useState } from "react";
 import { FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider } from 'react-native-paper';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import {
   createEmptyGrid,
   Grid,
@@ -79,17 +79,6 @@ const Cell = React.memo(({
 });
 
 export default function Index() {
-  // Reanimated pan values
-  const panX = useSharedValue(0);
-  const panY = useSharedValue(0);
-  const prevPanX = useSharedValue(0);
-  const prevPanY = useSharedValue(0);
-  const animatedStyles = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: panX.value },
-      { translateY: panY.value }
-    ]
-  }))
   // Cell size and margin must match styles.cell
   const CELL_SIZE = 36;
   const CELL_MARGIN = 2;
@@ -108,30 +97,9 @@ export default function Index() {
     position: 'absolute',
     left: 0,
     top: 0,
-    transform: [
-      { translateX: panX.value },
-      { translateY: panY.value },
-    ],
   }));
 
-  const panGesture = Gesture.Pan()
-  .minDistance(0)
-  .onStart(() => {
-    prevPanX.value = panX.value;
-    prevPanY.value = panY.value;
-  })
-  .onUpdate(e => {
-    panX.value = e.translationX + prevPanX.value;
-    panY.value = e.translationY + prevPanY.value;
-  });
 
-  // Center the grid in the container on mount and when grid/container size changes
-  React.useEffect(() => {
-    const offsetX = (containerSize.width - gridWidth) / 2 - CELL_SIZE/2;
-    const offsetY = (containerSize.height - gridHeight) / 2 - CELL_SIZE/2;
-    panX.value = offsetX;
-    panY.value = offsetY;
-  }, [gridWidth, gridHeight, containerSize.width, containerSize.height]);
   const [grid, setGrid] = useState(() => createEmptyGrid(ROWS, COLS));
   const [minesPlaced, setMinesPlaced] = useState(false);
 
@@ -356,8 +324,7 @@ export default function Index() {
           <Text style={styles.resetText} numberOfLines={1} adjustsFontSizeToFit>{flagMode ? "🚩 Mode" : "👆 Mode"}</Text>
         </TouchableOpacity>
       </View>
-      <View style={[styles.gridPanContainer, { width: containerSize.width, height: containerSize.height }]}>
-        <GestureDetector gesture={panGesture}>
+      <View style={[styles.gridContainer, { width: containerSize.width, height: containerSize.height }]}>
           <Animated.View style={[styles.grid, animatedGridStyle]}>
             <FlatList
               key={`grid-${COLS}`}
@@ -408,7 +375,6 @@ export default function Index() {
               })}
             />
           </Animated.View>
-        </GestureDetector>
       </View>
       <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
         <Text style={styles.resetText}>Reset</Text>
@@ -577,7 +543,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 2 },
     textShadowRadius: 4,
   },
-  gridPanContainer: {
+  gridContainer: {
     // width and height are set dynamically in the component
     alignSelf: 'center',
     overflow: 'hidden',
