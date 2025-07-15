@@ -1,28 +1,39 @@
 // If you haven't installed expo-linear-gradient, run: npx expo install expo-linear-gradient
 import { LinearGradient } from 'expo-linear-gradient';
-import { default as React, useCallback, useState } from "react";
-import { Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
+import { default as React, useState } from "react";
+import { Dimensions, FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider } from 'react-native-paper';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import {
-  Cell as CellType,
   createEmptyGrid,
   Grid,
   revealCellsDFS
 } from "./multisweeper";
+//const API_BASE_URL = "https://multisweeper-dpeu.onrender.com";
+const API_BASE_URL = "http://localhost:3001";
 
-const API_BASE_URL = "https://multisweeper-dpeu.onrender.com";
-
-const ROWS = 10
-const COLS = 8
-const MINES = 10
+const DIFFICULTIES = [
+  { label: "Easy (10x8, 10 mines)", value: "easy", rows: 10, cols: 8, mines: 10 },
+  { label: "Medium (15x12, 25 mines)", value: "medium", rows: 15, cols: 12, mines: 25 },
+  { label: "Hard (24x18, 50 mines)", value: "hard", rows: 24, cols: 18, mines: 50 },
+];
 
 // Dynamic container size based on difficulty
-const getContainerSize = (gridWidth: number, gridHeight: number) => {
+const getContainerSize = (difficulty: string, gridWidth: number, gridHeight: number) => {
   const margin = 40; // Small margin around the grid
-  return {
-    width: gridWidth + margin,
-    height: gridHeight + margin,
-  };
+  if (difficulty === "easy") {
+    return {
+      width: gridWidth + margin,
+      height: gridHeight + margin,
+    };
+  } else {
+    // Medium and Hard keep the current large container size
+    return {
+      width: Dimensions.get('window').width * 0.9,
+      height: Dimensions.get('window').height * 0.6,
+    };
+  }
 };
 
 // Color map for adjacent mine numbers
@@ -37,19 +48,8 @@ const adjColors: { [key: number]: string } = {
   8: "#455a64",
 };
 
-// TypeScript interface for Cell props
-interface CellProps {
-  cell: CellType;
-  onPress: () => void;
-  onLongPress: () => void;
-  delayLongPress: number;
-  cellStyle: StyleProp<ViewStyle>;
-  rowIdx: number;
-  colIdx: number;
-}
-
 // Memoized Cell component
-const Cell = React.memo<CellProps>(({
+const Cell = React.memo(({
   cell,
   onPress,
   onLongPress,
@@ -57,6 +57,14 @@ const Cell = React.memo<CellProps>(({
   cellStyle,
   rowIdx,
   colIdx
+}: {
+  cell: any,
+  onPress: () => void,
+  onLongPress: () => void,
+  delayLongPress: number,
+  cellStyle: any[],
+  rowIdx: number,
+  colIdx: number
 }) => {
   return (
     <TouchableOpacity
@@ -82,19 +90,76 @@ const Cell = React.memo<CellProps>(({
 });
 
 export default function Index() {
+  // Reanimated pan values
+  const panX = useSharedValue(0);
+  const panY = useSharedValue(0);
+  const prevPanX = useSharedValue(0);
+  const prevPanY = useSharedValue(0);
+  const animatedStyles = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: panX.value },
+      { translateY: panY.value }
+    ]
+  }))
+  // Cell size and margin must match styles.cell
   const CELL_SIZE = 36;
   const CELL_MARGIN = 2;
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [victoryVisible, setVictoryVisible] = useState(false);
   const [gameTime, setGameTime] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
-  const [flagCount, setFlagCount] = useState(MINES);
+  const [difficulty, setDifficulty] = useState("easy");
+  const [flagCount, setFlagCount] = useState(0);
   const [flagMode, setFlagMode] = useState(false);
-  const gridWidth = (COLS) * (CELL_SIZE + CELL_MARGIN);
-  const gridHeight = (ROWS) * (CELL_SIZE + CELL_MARGIN);
-  const containerSize = getContainerSize(gridWidth, gridHeight);
+  const difficultyObj = DIFFICULTIES.find(d => d.value === difficulty) || DIFFICULTIES[0];
+  const { rows, cols, mines } = difficultyObj;
+  const gridWidth = (cols) * (CELL_SIZE + CELL_MARGIN);
+  const gridHeight = (rows) * (CELL_SIZE + CELL_MARGIN);
+  const containerSize = getContainerSize(difficulty, gridWidth, gridHeight);
 
-  const [grid, setGrid] = useState(() => createEmptyGrid(ROWS, COLS));
+  const animatedGridStyle = useAnimatedStyle(() => ({
+    width: gridWidth + (difficulty === "easy" ? CELL_SIZE-CELL_MARGIN : difficulty === "medium" ? CELL_SIZE+(2*CELL_MARGIN) : (CELL_SIZE*1.4)+(1*CELL_MARGIN)),
+    height: gridHeight + (difficulty === "easy" ? CELL_SIZE : difficulty === "medium" ? CELL_SIZE * 1.25 : CELL_SIZE * 1.75),
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    transform: [
+      { translateX: panX.value },
+      { translateY: panY.value },
+    ],
+  }));
+
+  const panGesture = Gesture.Pan()
+  .minDistance(0)
+  .onStart(() => {
+    prevPanX.value = panX.value;
+    prevPanY.value = panY.value;
+  })
+  .onUpdate(e => {
+    panX.value = e.translationX + prevPanX.value;
+    panY.value = e.translationY + prevPanY.value;
+  });
+
+  // Center the grid in the container on mount and when grid/container size changes
+  React.useEffect(() => {
+    const offsetX = (containerSize.width - gridWidth) / 2 - CELL_SIZE/2;
+    const offsetY = (containerSize.height - gridHeight) / 2 - CELL_SIZE/2;
+    panX.value = offsetX;
+    panY.value = offsetY;
+  }, [gridWidth, gridHeight, containerSize.width, containerSize.height]);
+  const [grid, setGrid] = useState(() => createEmptyGrid(rows, cols));
   const [minesPlaced, setMinesPlaced] = useState(false);
+
+  // Reset grid when difficulty changes
+  React.useEffect(() => {
+    setGrid(createEmptyGrid(rows, cols));
+    setMinesPlaced(false);
+  }, [difficulty]);
+
+  // Update flag count when difficulty changes
+  React.useEffect(() => {
+    setFlagCount(mines);
+  }, [difficulty]);
 
   // Timer effect
   React.useEffect(() => {
@@ -116,6 +181,21 @@ export default function Index() {
     return `${mins}:${secsFormatted.padStart(2 + precision, '0')}`;
   };
 
+  const handleSettingsPress = () => {
+    setSettingsVisible(true);
+  };
+
+  const handleSettingsClose = () => {
+    setSettingsVisible(false);
+  };
+
+  const handleDifficultySelect = (value: string) => {
+    setDifficulty(value);
+    setSettingsVisible(false);
+    setGameTime(0);
+    setTimerActive(false);
+  };
+
   const checkWin = (grid: Grid) => {
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid[0].length; col++) {
@@ -133,7 +213,7 @@ export default function Index() {
     setVictoryVisible(false);
   };
 
-  const handleCellPress = useCallback(async (row: number, col: number) => {
+  const handleCellPress = async (row: number, col: number) => {
     let newGrid: Grid = grid;
     const cell = newGrid[row][col];
     if (cell.revealed && cell.adjacentMines > 0) {
@@ -198,23 +278,26 @@ export default function Index() {
       newGrid = grid.map((rowArr, r) =>
         rowArr.map((cell, c) => ({ ...cell }))
       );
+//
+    const response = await fetch(`${API_BASE_URL}/start-game`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rows,
+        cols,
+        mines,
+        firstClickRow: row,
+        firstClickCol: col,
+      }),
+    });
 
-      const response = await fetch(`${API_BASE_URL}/start-game`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rows: ROWS,
-          cols: COLS,
-          mines: MINES,
-          firstClickRow: row,
-          firstClickCol: col,
-        }),
-      });
+    const result = await response.json();
+    setGrid(result.grid);
+    setMinesPlaced(true);
+    setTimerActive(true);
 
-      const result = await response.json();
-      setGrid(result.grid);
-      setMinesPlaced(true);
-      setTimerActive(true);
+
+//
 
     } else {
       if (!cell.revealed) {
@@ -234,23 +317,27 @@ export default function Index() {
           newGrid = grid.map((rowArr, r) =>
             rowArr.map((cell, c) => ({ ...cell }))
           );
+//
+        try {
+          const response = await fetch(`${API_BASE_URL}/reveal`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              grid,
+              row,
+              col,
+            }),
+          });
 
-          try {
-            const response = await fetch(`${API_BASE_URL}/reveal`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                grid,
-                row,
-                col,
-              }),
-            });
+          const result = await response.json();
+          setGrid(result.grid);
+        } catch (err) {
+          console.error("Reveal error:", err);
+        }
 
-            const result = await response.json();
-            setGrid(result.grid);
-          } catch (err) {
-            console.error("Reveal error:", err);
-          }
+
+//
+
 
         } else {
           newRow[col] = { ...cell, revealed: true };
@@ -265,9 +352,9 @@ export default function Index() {
       setTimerActive(false); // Stop timer when game is won
       setVictoryVisible(true);
     }
-  }, [grid, minesPlaced, ROWS, COLS, MINES]);
+  };
 
-  const handleCellLongPress = useCallback((row: number, col: number) => {
+  const handleCellLongPress = (row: number, col: number) => {
     const cell = grid[row][col];
     if (!cell.revealed) {
       // Only copy the row and cell that change
@@ -278,46 +365,27 @@ export default function Index() {
       setFlagCount(prev => !cell.flagged ? prev - 1 : prev + 1);
       setGrid(newGrid);
     }
-  }, [grid]);
+  };
 
   const handleReset = () => {
-    setGrid(createEmptyGrid(ROWS, COLS));
+    setGrid(createEmptyGrid(rows, cols));
     setMinesPlaced(false);
-    setFlagCount(MINES);
+    setFlagCount(mines);
     setGameTime(0);
     setTimerActive(false);
   };
 
-  // Memoized cell press handler
-  const createCellPressHandler = useCallback((rowIdx: number, colIdx: number) => {
-    return () => {
-      const cell = grid[rowIdx][colIdx];
-      if (cell.revealed && cell.adjacentMines > 0) {
-        handleCellPress(rowIdx, colIdx);
-      } else if (flagMode) {
-        handleCellLongPress(rowIdx, colIdx);
-      } else {
-        handleCellPress(rowIdx, colIdx);
-      }
-    };
-  }, [grid, flagMode, handleCellPress, handleCellLongPress]);
-
-  // Memoized cell long press handler
-  const createCellLongPressHandler = useCallback((rowIdx: number, colIdx: number) => {
-    return () => {
-      if (flagMode) {
-        handleCellPress(rowIdx, colIdx);
-      } else {
-        handleCellLongPress(rowIdx, colIdx);
-      }
-    };
-  }, [flagMode, handleCellPress, handleCellLongPress]);
+  const flatGrid = React.useMemo(() => grid.flat(), [grid]);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider>
     <LinearGradient colors={["#43cea2", "#185a9d"]} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Multisweeper</Text>
+        <TouchableOpacity style={[styles.settingsButton, { position: 'absolute', right: 20 }]} onPress={handleSettingsPress}>
+          <Text style={styles.settingsIcon}>⚙️</Text>
+        </TouchableOpacity>
       </View>
       <View style={[styles.infoBar, { maxWidth: containerSize.width }]}>
         <Text style={styles.timerText} numberOfLines={1} adjustsFontSizeToFit>⏱️ {formatTime(gameTime)}</Text>
@@ -330,29 +398,95 @@ export default function Index() {
         </TouchableOpacity>
       </View>
       <View style={[styles.gridPanContainer, { width: containerSize.width, height: containerSize.height }]}>
-          {Array(ROWS).fill(0).map((_, r) => (
-            <View key={r} style={styles.row}>
-              {Array(COLS).fill(0).map((_, c) => (
-                <Cell
-                  key={`${r}-${c}`}
-                  cell={grid[r][c]}
-                  onPress={() => handleCellPress(r, c)}
-                  onLongPress={() => handleCellLongPress(r, c)}
-                  delayLongPress={100}
-                  cellStyle={[
-                    styles.cell,
-                    grid[r][c].revealed && styles.revealedCell
-                  ]}
-                  rowIdx={r}
-                  colIdx={c}
-                />
-              ))}
-            </View>
-          ))}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[styles.grid, animatedGridStyle]}>
+            <FlatList
+              key={`grid-${cols}`}
+              data={flatGrid}
+              keyExtractor={(_, index) => index.toString()}
+              numColumns={cols}
+              scrollEnabled={false}
+              renderItem={({ item: cell, index }) => {
+                const rowIdx = Math.floor(index / cols);
+                const colIdx = index % cols;
+                let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
+                if (cell.revealed) cellStyle.push(styles.revealedCell);
+                if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
+
+                return (
+                  <Cell
+                    cell={cell}
+                    onPress={() => {
+                      const cell = grid[rowIdx][colIdx];
+                      if (cell.revealed && cell.adjacentMines > 0) {
+                        handleCellPress(rowIdx, colIdx);
+                      } else if (flagMode) {
+                        handleCellLongPress(rowIdx, colIdx);
+                      } else {
+                        handleCellPress(rowIdx, colIdx);
+                      }
+                    }}
+                    onLongPress={() =>
+                      flagMode
+                        ? handleCellPress(rowIdx, colIdx)
+                        : handleCellLongPress(rowIdx, colIdx)
+                    }
+                    delayLongPress={250}
+                    cellStyle={cellStyle}
+                    rowIdx={rowIdx}
+                    colIdx={colIdx}
+                  />
+                );
+              }}
+              contentContainerStyle={{
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+              getItemLayout={(_, index) => ({
+                length: CELL_SIZE + CELL_MARGIN,
+                offset: (CELL_SIZE + CELL_MARGIN) * index,
+                index,
+              })}
+            />
+          </Animated.View>
+        </GestureDetector>
       </View>
       <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
         <Text style={styles.resetText}>Reset</Text>
       </TouchableOpacity>
+      <Modal
+        visible={settingsVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleSettingsClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Settings</Text>
+            <Text style={styles.modalSubtitle}>Select Difficulty:</Text>
+            {DIFFICULTIES.map((d) => (
+              <TouchableOpacity
+                key={d.value}
+                style={[
+                  styles.difficultyOption,
+                  d.value === difficulty && styles.selectedDifficulty
+                ]}
+                onPress={() => handleDifficultySelect(d.value)}
+              >
+                <Text style={[
+                  styles.difficultyText,
+                  d.value === difficulty && styles.selectedDifficultyText
+                ]}>
+                  {d.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.closeButton} onPress={handleSettingsClose}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={victoryVisible}
         transparent={true}
@@ -371,6 +505,7 @@ export default function Index() {
       </Modal>
     </LinearGradient>
     </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -414,6 +549,17 @@ const styles = StyleSheet.create({
     textShadowColor: "#0006",
     textShadowOffset: { width: 1, height: 2 },
     textShadowRadius: 4,
+  },
+  settingsButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsIcon: {
+    fontSize: 20,
   },
   pickerContainer: {
     width: 260,
@@ -523,8 +669,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.04)',
     borderRadius: 16,
     marginBottom: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -555,6 +699,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 12,
+  },
+  difficultyOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginVertical: 4,
+    backgroundColor: '#f5f5f5',
+  },
+  selectedDifficulty: {
+    backgroundColor: '#1976d2',
+  },
+  difficultyText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedDifficultyText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   closeButton: {
     backgroundColor: '#1976d2',
