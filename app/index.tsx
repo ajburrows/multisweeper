@@ -1,7 +1,7 @@
 // If you haven't installed expo-linear-gradient, run: npx expo install expo-linear-gradient
 import { LinearGradient } from 'expo-linear-gradient';
 import { default as React, useState } from "react";
-import { FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider } from 'react-native-paper';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -326,6 +326,45 @@ export default function Index() {
       </View>
       <View style={[styles.gridContainer, { width: containerSize.width, height: containerSize.height }]}>
           <Animated.View style={[styles.grid, animatedGridStyle]}>
+            {grid.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.row}>
+                {row.map((cell, colIndex) => (
+
+                  <Cell
+                    key={`${rowIndex}-${colIndex}`}
+                    cell={cell}
+                    onPress={() => {
+                      const cell = grid[rowIndex][colIndex];
+                      if (cell.revealed && cell.adjacentMines > 0) {
+                        handleCellPress(rowIndex, colIndex);
+                      } else if (flagMode) {
+                        handleCellLongPress(rowIndex, colIndex);
+                      } else {
+                        handleCellPress(rowIndex, colIndex);
+                      }
+                    }}
+                    onLongPress={() => {
+                      if (flagMode) {
+                        handleCellPress(rowIndex, colIndex);
+                      } else {
+                        handleCellLongPress(rowIndex, colIndex);
+                      }
+                    }}
+                    delayLongPress={250}
+                    cellStyle={[
+                      styles.cell,
+                      cell.revealed && styles.revealedCell,
+                      cell.hasMine && cell.revealed && styles.mineCell
+                    ]}
+                    rowIdx={rowIndex}
+                    colIdx={colIndex}
+                  />
+                ))}
+              </View>
+            ))}
+          
+          {
+            /*
             <FlatList
               key={`grid-${COLS}`}
               data={flatGrid}
@@ -364,16 +403,8 @@ export default function Index() {
                   />
                 );
               }}
-              contentContainerStyle={{
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-              getItemLayout={(_, index) => ({
-                length: CELL_SIZE + CELL_MARGIN,
-                offset: (CELL_SIZE + CELL_MARGIN) * index,
-                index,
-              })}
             />
+            */}
           </Animated.View>
       </View>
       <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
@@ -650,3 +681,55 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 });
+
+
+{/*
+            <FlatList
+              key={`grid-${COLS}`}
+              data={flatGrid}
+              keyExtractor={(_, index) => index.toString()}
+              numColumns={COLS}
+              scrollEnabled={false}
+              renderItem={({ item: cell, index }) => {
+                const rowIdx = Math.floor(index / COLS);
+                const colIdx = index % COLS;
+                let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
+                if (cell.revealed) cellStyle.push(styles.revealedCell);
+                if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
+
+                return (
+                  <Cell
+                    cell={cell}
+                    onPress={() => {
+                      const cell = grid[rowIdx][colIdx];
+                      if (cell.revealed && cell.adjacentMines > 0) {
+                        handleCellPress(rowIdx, colIdx);
+                      } else if (flagMode) {
+                        handleCellLongPress(rowIdx, colIdx);
+                      } else {
+                        handleCellPress(rowIdx, colIdx);
+                      }
+                    }}
+                    onLongPress={() =>
+                      flagMode
+                        ? handleCellPress(rowIdx, colIdx)
+                        : handleCellLongPress(rowIdx, colIdx)
+                    }
+                    delayLongPress={250}
+                    cellStyle={cellStyle}
+                    rowIdx={rowIdx}
+                    colIdx={colIdx}
+                  />
+                );
+              }}
+              contentContainerStyle={{
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+              getItemLayout={(_, index) => ({
+                length: CELL_SIZE + CELL_MARGIN,
+                offset: (CELL_SIZE + CELL_MARGIN) * index,
+                index,
+              })}
+            />
+            */}
