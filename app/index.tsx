@@ -1,7 +1,7 @@
 // If you haven't installed expo-linear-gradient, run: npx expo install expo-linear-gradient
 import { LinearGradient } from 'expo-linear-gradient';
 import { default as React, useState } from "react";
-import { Dimensions, FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
+import { FlatList, Modal, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider as PaperProvider } from 'react-native-paper';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -12,28 +12,17 @@ import {
 } from "./multisweeper";
 //const API_BASE_URL = "https://multisweeper-dpeu.onrender.com";
 const API_BASE_URL = "http://localhost:3001";
-
-const DIFFICULTIES = [
-  { label: "Easy (10x8, 10 mines)", value: "easy", rows: 10, cols: 8, mines: 10 },
-  { label: "Medium (15x12, 25 mines)", value: "medium", rows: 15, cols: 12, mines: 25 },
-  { label: "Hard (24x18, 50 mines)", value: "hard", rows: 24, cols: 18, mines: 50 },
-];
+const ROWS = 10
+const COLS = 8
+const MINES = 10
 
 // Dynamic container size based on difficulty
-const getContainerSize = (difficulty: string, gridWidth: number, gridHeight: number) => {
+const getContainerSize = (gridWidth: number, gridHeight: number) => {
   const margin = 40; // Small margin around the grid
-  if (difficulty === "easy") {
     return {
       width: gridWidth + margin,
       height: gridHeight + margin,
     };
-  } else {
-    // Medium and Hard keep the current large container size
-    return {
-      width: Dimensions.get('window').width * 0.9,
-      height: Dimensions.get('window').height * 0.6,
-    };
-  }
 };
 
 // Color map for adjacent mine numbers
@@ -104,22 +93,18 @@ export default function Index() {
   // Cell size and margin must match styles.cell
   const CELL_SIZE = 36;
   const CELL_MARGIN = 2;
-  const [settingsVisible, setSettingsVisible] = useState(false);
   const [victoryVisible, setVictoryVisible] = useState(false);
   const [gameTime, setGameTime] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
-  const [difficulty, setDifficulty] = useState("easy");
   const [flagCount, setFlagCount] = useState(0);
   const [flagMode, setFlagMode] = useState(false);
-  const difficultyObj = DIFFICULTIES.find(d => d.value === difficulty) || DIFFICULTIES[0];
-  const { rows, cols, mines } = difficultyObj;
-  const gridWidth = (cols) * (CELL_SIZE + CELL_MARGIN);
-  const gridHeight = (rows) * (CELL_SIZE + CELL_MARGIN);
-  const containerSize = getContainerSize(difficulty, gridWidth, gridHeight);
+  const gridWidth = (COLS) * (CELL_SIZE + CELL_MARGIN);
+  const gridHeight = (ROWS) * (CELL_SIZE + CELL_MARGIN);
+  const containerSize = getContainerSize(gridWidth, gridHeight);
 
   const animatedGridStyle = useAnimatedStyle(() => ({
-    width: gridWidth + (difficulty === "easy" ? CELL_SIZE-CELL_MARGIN : difficulty === "medium" ? CELL_SIZE+(2*CELL_MARGIN) : (CELL_SIZE*1.4)+(1*CELL_MARGIN)),
-    height: gridHeight + (difficulty === "easy" ? CELL_SIZE : difficulty === "medium" ? CELL_SIZE * 1.25 : CELL_SIZE * 1.75),
+    width: gridWidth + CELL_SIZE - CELL_MARGIN,
+    height: gridHeight + CELL_SIZE,
     position: 'absolute',
     left: 0,
     top: 0,
@@ -147,19 +132,9 @@ export default function Index() {
     panX.value = offsetX;
     panY.value = offsetY;
   }, [gridWidth, gridHeight, containerSize.width, containerSize.height]);
-  const [grid, setGrid] = useState(() => createEmptyGrid(rows, cols));
+  const [grid, setGrid] = useState(() => createEmptyGrid(ROWS, COLS));
   const [minesPlaced, setMinesPlaced] = useState(false);
 
-  // Reset grid when difficulty changes
-  React.useEffect(() => {
-    setGrid(createEmptyGrid(rows, cols));
-    setMinesPlaced(false);
-  }, [difficulty]);
-
-  // Update flag count when difficulty changes
-  React.useEffect(() => {
-    setFlagCount(mines);
-  }, [difficulty]);
 
   // Timer effect
   React.useEffect(() => {
@@ -181,20 +156,7 @@ export default function Index() {
     return `${mins}:${secsFormatted.padStart(2 + precision, '0')}`;
   };
 
-  const handleSettingsPress = () => {
-    setSettingsVisible(true);
-  };
 
-  const handleSettingsClose = () => {
-    setSettingsVisible(false);
-  };
-
-  const handleDifficultySelect = (value: string) => {
-    setDifficulty(value);
-    setSettingsVisible(false);
-    setGameTime(0);
-    setTimerActive(false);
-  };
 
   const checkWin = (grid: Grid) => {
     for (let row = 0; row < grid.length; row++) {
@@ -283,9 +245,9 @@ export default function Index() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        rows,
-        cols,
-        mines,
+        rows: ROWS,
+        cols: COLS,
+        mines: MINES,
         firstClickRow: row,
         firstClickCol: col,
       }),
@@ -368,9 +330,9 @@ export default function Index() {
   };
 
   const handleReset = () => {
-    setGrid(createEmptyGrid(rows, cols));
+    setGrid(createEmptyGrid(ROWS, COLS));
     setMinesPlaced(false);
-    setFlagCount(mines);
+    setFlagCount(MINES);
     setGameTime(0);
     setTimerActive(false);
   };
@@ -383,9 +345,6 @@ export default function Index() {
     <LinearGradient colors={["#43cea2", "#185a9d"]} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Multisweeper</Text>
-        <TouchableOpacity style={[styles.settingsButton, { position: 'absolute', right: 20 }]} onPress={handleSettingsPress}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
-        </TouchableOpacity>
       </View>
       <View style={[styles.infoBar, { maxWidth: containerSize.width }]}>
         <Text style={styles.timerText} numberOfLines={1} adjustsFontSizeToFit>⏱️ {formatTime(gameTime)}</Text>
@@ -401,14 +360,14 @@ export default function Index() {
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.grid, animatedGridStyle]}>
             <FlatList
-              key={`grid-${cols}`}
+              key={`grid-${COLS}`}
               data={flatGrid}
               keyExtractor={(_, index) => index.toString()}
-              numColumns={cols}
+              numColumns={COLS}
               scrollEnabled={false}
               renderItem={({ item: cell, index }) => {
-                const rowIdx = Math.floor(index / cols);
-                const colIdx = index % cols;
+                const rowIdx = Math.floor(index / COLS);
+                const colIdx = index % COLS;
                 let cellStyle: StyleProp<ViewStyle>[] = [styles.cell];
                 if (cell.revealed) cellStyle.push(styles.revealedCell);
                 if (cell.hasMine && cell.revealed) cellStyle.push(styles.mineCell);
@@ -454,39 +413,6 @@ export default function Index() {
       <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
         <Text style={styles.resetText}>Reset</Text>
       </TouchableOpacity>
-      <Modal
-        visible={settingsVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleSettingsClose}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Settings</Text>
-            <Text style={styles.modalSubtitle}>Select Difficulty:</Text>
-            {DIFFICULTIES.map((d) => (
-              <TouchableOpacity
-                key={d.value}
-                style={[
-                  styles.difficultyOption,
-                  d.value === difficulty && styles.selectedDifficulty
-                ]}
-                onPress={() => handleDifficultySelect(d.value)}
-              >
-                <Text style={[
-                  styles.difficultyText,
-                  d.value === difficulty && styles.selectedDifficultyText
-                ]}>
-                  {d.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.closeButton} onPress={handleSettingsClose}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
       <Modal
         visible={victoryVisible}
         transparent={true}
@@ -549,17 +475,6 @@ const styles = StyleSheet.create({
     textShadowColor: "#0006",
     textShadowOffset: { width: 1, height: 2 },
     textShadowRadius: 4,
-  },
-  settingsButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsIcon: {
-    fontSize: 20,
   },
   pickerContainer: {
     width: 260,
@@ -699,24 +614,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 12,
-  },
-  difficultyOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginVertical: 4,
-    backgroundColor: '#f5f5f5',
-  },
-  selectedDifficulty: {
-    backgroundColor: '#1976d2',
-  },
-  difficultyText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  selectedDifficultyText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   closeButton: {
     backgroundColor: '#1976d2',
